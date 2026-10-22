@@ -1,0 +1,43 @@
+---
+title: "CPaaS+ API User Guide"
+description: "One API for SMS, WhatsApp, Email, RCS and Flow Builder."
+---
+
+CPaaS+ lets you reach customers on the channel that works best for them, through a single, consistent REST API. This guide explains how each channel works and how to call it. The **API Reference** tab lists every endpoint with an interactive playground.
+
+## Channels
+
+<CardGroup cols={2}>
+  <Card title="SMS" icon="message" href="/guides/sms">
+    Campaign, template and open-text SMS with delivery status.
+  </Card>
+  <Card title="WhatsApp" icon="whatsapp" href="/guides/whatsapp">
+    Template messages with or without media, order status updates and refunds.
+  </Card>
+  <Card title="WhatsApp user management" icon="user-slash" href="/guides/whatsapp-user-management">
+    Block, unblock, bulk-import and sync blocked users.
+  </Card>
+  <Card title="Email and OTP" icon="envelope" href="/guides/email">
+    Template and open-text email, delivery status, and email OTP verification.
+  </Card>
+  <Card title="RCS" icon="comments" href="/guides/rcs">
+    Rich templates, cards and carousels on the Vi and Jio routes.
+  </Card>
+  <Card title="Flow Builder" icon="diagram-project" href="/guides/flow-builder">
+    Trigger an automated journey from your own systems.
+  </Card>
+</CardGroup>
+
+## How the API works
+
+| Concept | Detail |
+| --- | --- |
+| Base URL | Provided at onboarding. Every path in this guide is relative to it. |
+| Authentication | Bearer token on every request. See [Authentication](/authentication). |
+| Format | JSON request bodies (`Content-Type: application/json`) unless an endpoint says otherwise. |
+| Templates | Most channels send from templates you create and get approved in the CPaaS+ web portal. |
+| Status | SMS, Email and RCS each expose a status endpoint. |
+
+<Note>
+  New to the API? Start with the [Quickstart](/quickstart) to send your first message in a few minutes.
+</Note>

@@ -1,0 +1,103 @@
+---
+title: "Email and OTP verification"
+description: "Send template or open-text email, track status, and verify users with an email OTP."
+---
+
+## Send using a template
+
+`POST /api/email/template/send`
+
+```bash
+curl -X POST "$BASE_URL/api/email/template/send" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service_name": "primary-email-service",
+    "template_name": "order_confirmation",
+    "from": "orders@example.com",
+    "from_name": "Example Store",
+    "to": "asha@example.com",
+    "cc": ["manager@example.com"],
+    "subject": "Your order ORD-1001",
+    "params": ["Asha", "ORD-1001"]
+  }'
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `service_name` | Yes | Service name of your email configuration. |
+| `template_name` | Yes | Name of the email template. |
+| `from` | Yes | Sender address on your configured domain. |
+| `from_name` | No | Display name of the sender. |
+| `to` | Yes | Destination email address. |
+| `cc`, `bcc` | No | Arrays of addresses. You can add several. |
+| `subject` | No | Subject line. |
+| `params` | No | Template variable values, in the order defined in the template. |
+| `attachments` | No | Array of attachments (see below). |
+
+## Send using open text
+
+`POST /api/email/send`
+
+```bash
+curl -X POST "$BASE_URL/api/email/send" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account": "primary-email-service",
+    "from": "orders@example.com",
+    "from_name": "Example Store",
+    "to": "asha@example.com",
+    "subject": "Your invoice",
+    "body": "Hi Asha, please find your invoice attached."
+  }'
+```
+
+## Attachments
+
+Each attachment has a `filename`, a MIME `type` (for example `application/pdf`) and the file as base64 in `content`.
+
+```json
+"attachments": [
+  { "filename": "invoice.pdf", "type": "application/pdf", "content": "JVBERi0xLjQK..." }
+]
+```
+
+## Check email status
+
+```bash
+curl "$BASE_URL/api/email/status?id=MESSAGE_ID" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+## Verify users with an email OTP
+
+OTP verification is a two-step flow.
+
+<Steps>
+  <Step title="Generate and send the OTP">
+    Create a verification template in the CPaaS+ portal and copy its Verification ID.
+
+    ```bash
+    curl -X POST "$BASE_URL/api/verify/send-otp" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      --get \
+      --data-urlencode "verification_id=VERIFICATION_ID" \
+      --data-urlencode "type=email" \
+      --data-urlencode "email=asha@example.com"
+    ```
+
+    The response includes a `unique_id`. Keep it, as you need it in the next step.
+  </Step>
+  <Step title="Validate the OTP">
+    When the user enters the code they received, validate it.
+
+    ```bash
+    curl -X POST "$BASE_URL/api/verify/validate-otp" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      --get \
+      --data-urlencode "unique_id=UNIQUE_ID" \
+      --data-urlencode "otp=123456"
+    ```
+  </Step>
+</Steps>

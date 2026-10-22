@@ -1,0 +1,97 @@
+---
+title: "WhatsApp messaging"
+description: "Send template messages, update order status and issue refunds."
+---
+
+WhatsApp messages are sent from templates approved for your WhatsApp Business number (the *sender ID* or WABA number).
+
+## Send a template message
+
+`POST /api/whatsapp/msg`
+
+<Tabs>
+  <Tab title="Without media">
+    Use this for templates that contain text and variables.
+
+    ```bash
+    curl -X POST "$BASE_URL/api/whatsapp/msg" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "source": "919000000000",
+        "destination": "919876543210",
+        "template": {
+          "id": "order_update",
+          "params": ["Asha", "ORD-1001"]
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="With media">
+    Use this for templates with a document, PDF or image header. Pass a publicly reachable URL.
+
+    ```bash
+    curl -X POST "$BASE_URL/api/whatsapp/msg" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "source": "919000000000",
+        "destination": "919876543210",
+        "template": { "id": "invoice_share" },
+        "media_url": "https://example.com/files/invoice.pdf"
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `source` | Yes | Your WhatsApp sender ID (WABA number). |
+| `destination` | Yes | Recipient phone number. |
+| `template.id` | Yes | Approved template ID. |
+| `template.params` | No | Values for the body variables, in order. |
+| `media_url` | No | URL of the document, PDF or image for templates with a media header. |
+
+## Update order status
+
+If you take orders and payments over WhatsApp, keep the customer informed as the order progresses.
+
+`POST /api/whatsapp/{source}/order-status/update`, where `{source}` is your WABA number.
+
+```bash
+curl -X POST "$BASE_URL/api/whatsapp/919000000000/order-status/update" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_reference_id": "ORD-1001",
+    "status": "shipped",
+    "status_notes": "Thank you for your purchase"
+  }'
+```
+
+`status` must be one of `partially-shipped`, `shipped`, `completed` or `canceled`.
+
+## Refund an order
+
+`POST /api/whatsapp/{account}/payment/refund`
+
+```bash
+curl -X POST "$BASE_URL/api/whatsapp/ACCOUNT/payment/refund" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_reference_id": "ORD-1001",
+    "amount": "499.00",
+    "speed": "Normal"
+  }'
+```
+
+| Field | Description |
+| --- | --- |
+| `order_reference_id` | Reference ID used in the Order Details template. |
+| `amount` | Amount to refund. |
+| `speed` | `Normal` or `Instant`. |
+
+<Note>
+  The `{account}` path segment is the account identifier supplied to you at onboarding.
+</Note>

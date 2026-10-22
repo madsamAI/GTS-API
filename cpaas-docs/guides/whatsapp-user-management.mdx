@@ -1,0 +1,68 @@
+---
+title: "WhatsApp user management"
+description: "Block, unblock, bulk-import and sync blocked users."
+---
+
+Use these endpoints to manage which users are blocked from messaging a WhatsApp Business number. Every call identifies the number with `sender_id` (your WABA number).
+
+## Block users
+
+`POST /api/whatsapp/blocked-members`
+
+```bash
+curl -X POST "$BASE_URL/api/whatsapp/blocked-members" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sender_id": "919000000000",
+    "phone_numbers": ["919876543210"]
+  }'
+```
+
+## Unblock users
+
+`DELETE /api/whatsapp/blocked-members` with the same body shape. Add several numbers to the array to unblock them together.
+
+```bash
+curl -X DELETE "$BASE_URL/api/whatsapp/blocked-members" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sender_id": "919000000000",
+    "phone_numbers": ["919876543210", "919876543211"]
+  }'
+```
+
+## List blocked users
+
+`GET /api/whatsapp/blocked-members`
+
+```bash
+curl "$BASE_URL/api/whatsapp/blocked-members?sender_id=919000000000&per_page=50&page=1" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+Use `per_page` and `page` to paginate through large lists.
+
+## Block in bulk from a CSV
+
+`POST /api/whatsapp/blocked-members/import-csv` as `multipart/form-data`.
+
+```bash
+curl -X POST "$BASE_URL/api/whatsapp/blocked-members/import-csv" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -F "sender_id=919000000000" \
+  -F "action=block" \
+  -F "csv_file=@blocked_numbers.csv"
+```
+
+## Sync blocked users
+
+`POST /api/whatsapp/blocked-members/sync` synchronises the blocked list for a sender.
+
+```bash
+curl -X POST "$BASE_URL/api/whatsapp/blocked-members/sync" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "sender_id": "919000000000" }'
+```

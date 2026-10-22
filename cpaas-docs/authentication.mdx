@@ -1,0 +1,32 @@
+---
+title: "Authentication"
+description: "Authenticate every request with a bearer token."
+---
+
+All CPaaS+ endpoints use **bearer-token authentication**. Send your token in the `Authorization` header:
+
+```http
+Authorization: Bearer YOUR_API_TOKEN
+```
+
+## Getting a token
+
+Use the API token issued for your CPaaS+ account. Store it in a secrets manager or an environment variable.
+
+## Recommended headers
+
+| Header | Value | Notes |
+| --- | --- | --- |
+| `Authorization` | `Bearer YOUR_API_TOKEN` | Required on every request. |
+| `Accept` | `application/json` | Recommended on every request. |
+| `Content-Type` | `application/json` | Required for JSON bodies. File upload uses `multipart/form-data`. |
+
+## Keeping your token safe
+
+<Warning>
+  Treat the token like a password. Never embed it in mobile apps, browser code, public repositories or shared Postman collections. If a token is exposed, contact your CPaaS+ administrator to revoke it and issue a new one.
+</Warning>
+
+## Unauthorized responses
+
+A missing, invalid or expired token returns `401 Unauthorized`. Check the header format (`Bearer` followed by a single space and the token) and that the token has not been revoked.

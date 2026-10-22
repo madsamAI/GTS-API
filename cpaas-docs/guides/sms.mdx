@@ -1,0 +1,88 @@
+---
+title: "SMS"
+description: "Send SMS by campaign, template or open text, and track delivery."
+---
+
+CPaaS+ offers three ways to send an SMS. Pick the one that matches how you manage content.
+
+| Method | Endpoint | Use it when |
+| --- | --- | --- |
+| Campaign | `POST /api/sms/send-msg` | Content and sender are preconfigured in a portal campaign. |
+| Template | `POST /api/sms/template/send` | You send from an approved template, up to 50 recipients per call. |
+| Open text | `POST /api/sms/send` | You supply the message text and sender on each call. |
+
+## Send using a campaign
+
+Create a campaign in the web portal under **Campaigns** and copy its Campaign ID. Then pass the destination number and the dynamic values as query parameters. No request body is needed.
+
+```bash
+curl -X POST "$BASE_URL/api/sms/send-msg" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  --get \
+  --data-urlencode "campaign_id=1234" \
+  --data-urlencode "phone=919876543210" \
+  --data-urlencode 'params=["Asha","ORD-1001","25 Dec"]'
+```
+
+<Note>
+  `params` is a URL-encoded JSON array. Provide one value for each dynamic variable in the campaign template, in order.
+</Note>
+
+## Send using a template
+
+```bash
+curl -X POST "$BASE_URL/api/sms/template/send" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "alias": "TPL_ORDER_CONFIRM",
+    "to": ["919876543210", "919876543211"],
+    "params": { "1": "ORD-1001" }
+  }'
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `alias` | Yes | Template ID from the web portal. |
+| `to` | Yes | Destination numbers. Up to 50 per request. |
+| `params` | No | Values keyed by variable position, as defined in the template. |
+
+## Send using open text
+
+```bash
+curl -X POST "$BASE_URL/api/sms/send" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "CPAAS",
+    "to": ["919876543210"],
+    "text": "Your order ORD-1001 has been shipped.",
+    "type": "N",
+    "product": "Transactional",
+    "template_id": "1107160000000000000",
+    "entity_id": "1101160000000000000"
+  }'
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `from` | Yes | Registered sender or header. |
+| `to` | Yes | Destination numbers. |
+| `text` | Yes | Message text. |
+| `type` | No | `N` plain text (default), `U` Unicode, `A` auto-detect. |
+| `product` | No | `Transactional`, `Promotional`, `OTP` or `Other`. |
+| `template_id` | India | Registered template ID. Mandatory in India. |
+| `entity_id` | India | Registered entity ID. Mandatory in India. |
+
+<Warning>
+  In India, `template_id` and `entity_id` are mandatory, and the message text must match the registered template.
+</Warning>
+
+## Check delivery status
+
+```bash
+curl "$BASE_URL/api/sms/status?id=MESSAGE_ID" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+All filters are optional and can be combined: `number`, `id`, `from`, `code` (error code) and `status`.

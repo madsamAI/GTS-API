@@ -1,0 +1,32 @@
+---
+title: "Flow Builder API"
+description: "Trigger an automated journey from your own systems."
+---
+
+Flow Builder lets you design multi-step journeys in the CPaaS+ portal (for example a WhatsApp message followed by an email). The Flow Builder API starts a journey by sending contact data to the flow's endpoint.
+
+## Trigger a flow
+
+Copy the endpoint URL generated for your flow in Flow Builder and `POST` the contact data to it.
+
+```bash
+curl -X POST "$FLOW_ENDPOINT_URL" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "919876543210",
+    "email": "asha@example.com",
+    "var1": "Asha",
+    "var2": "ORD-1001"
+  }'
+```
+
+| Field | Description |
+| --- | --- |
+| `phone` | Contact mobile number. |
+| `email` | Contact email address. |
+| `var1`, `var2`, ... | Variables your flow uses, as configured in the flow. |
+
+<Note>
+  The fields you need depend on the channels in your flow: send `phone` for SMS, WhatsApp or RCS steps and `email` for email steps, plus any variables the flow references.
+</Note>

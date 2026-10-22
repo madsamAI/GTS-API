@@ -1,0 +1,870 @@
+openapi: 3.1.0
+info:
+  title: CPaaS+ Messaging API
+  version: 1.0.0
+  description: |
+    Unified REST API for sending and managing customer communications across
+    **SMS**, **WhatsApp**, **Email (including OTP verification)**, **RCS** and **Flow Builder**.
+
+    All endpoints use bearer-token authentication. Use the API token issued for your account
+    and send it as `Authorization: Bearer <token>` on every request.
+servers:
+  - url: "{baseUrl}"
+    description: "Your CPaaS+ API host (provided at onboarding)"
+    variables:
+      baseUrl:
+        default: https://your-cpaas-host.example.com
+        description: "Base URL of your CPaaS+ environment, without a trailing slash."
+security:
+  - bearerAuth: []
+tags:
+  - name: SMS
+    description: "Send SMS using portal campaigns, approved templates, or open text, and check delivery status."
+  - name: WhatsApp Messaging
+    description: "Send WhatsApp template messages and manage order status and refunds."
+  - name: WhatsApp User Management
+    description: "Block, unblock, bulk-import and sync blocked WhatsApp users for a WABA number."
+  - name: Email
+    description: "Send template-based or open-text email and check delivery status."
+  - name: Email Verification
+    description: "Generate and validate one-time passwords (OTP) delivered by email."
+  - name: RCS Templates
+    description: "Create RCS templates (text with buttons, rich card, carousel)."
+  - name: RCS Messaging
+    description: "Send RCS messages and check message status."
+  - name: Flow Builder
+    description: "Trigger a Flow Builder journey with contact data."
+paths:
+  /api/sms/send-msg:
+    post:
+      tags: [SMS]
+      operationId: sendSmsCampaign
+      summary: Send SMS using a campaign
+      description: |
+        Sends a single SMS using a campaign configured in the web portal. The campaign defines the
+        sender, template and content; you supply the destination number and the dynamic values.
+
+        No request body is required: all inputs are query parameters.
+      parameters:
+        - name: campaign_id
+          in: query
+          required: true
+          description: "Campaign ID generated in the web portal under **Campaigns**."
+          schema: { type: string }
+          example: "1234"
+        - name: phone
+          in: query
+          required: true
+          description: "Destination mobile number the message will be delivered to."
+          schema: { type: string }
+          example: "919876543210"
+        - name: params
+          in: query
+          required: false
+          description: |
+            JSON array (URL-encoded) of the dynamic values defined in the campaign template,
+            in order. Example: `["Asha","ORD-1001","25 Dec"]`.
+          schema: { type: string }
+          example: '["Asha","ORD-1001","25 Dec"]'
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/sms/template/send:
+    post:
+      tags: [SMS]
+      operationId: sendSmsTemplate
+      summary: Send SMS using a template
+      description: "Sends an SMS based on a template (alias) created in the CPaaS+ web portal. Up to 50 recipients per request."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmsTemplateSendRequest" }
+            example:
+              alias: "TPL_ORDER_CONFIRM"
+              to: ["919876543210"]
+              params: { "1": "ORD-1001" }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/sms/send:
+    post:
+      tags: [SMS]
+      operationId: sendSmsOpenText
+      summary: Send SMS with open text
+      description: |
+        Sends an SMS with free-form text. In India, `template_id` and `entity_id` (DLT) are mandatory
+        and the text must match the registered template.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmsOpenTextRequest" }
+            example:
+              from: "CPAAS"
+              to: ["919876543210"]
+              text: "Your order ORD-1001 has been shipped."
+              type: "N"
+              product: "Transactional"
+              template_id: "1107160000000000000"
+              entity_id: "1101160000000000000"
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/sms/status:
+    get:
+      tags: [SMS]
+      operationId: getSmsStatus
+      summary: Get SMS status
+      description: "Retrieves delivery status for SMS messages. All filters are optional and can be combined."
+      parameters:
+        - { name: number, in: query, required: false, description: "Filter by destination mobile number.", schema: { type: string } }
+        - { name: id, in: query, required: false, description: "Filter by message ID.", schema: { type: string } }
+        - { name: from, in: query, required: false, description: "Filter by sender / header.", schema: { type: string } }
+        - { name: code, in: query, required: false, description: "Filter by error code.", schema: { type: string } }
+        - { name: status, in: query, required: false, description: "Filter by delivery status.", schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/msg:
+    post:
+      tags: [WhatsApp Messaging]
+      operationId: sendWhatsAppMessage
+      summary: Send a WhatsApp template message
+      description: |
+        Sends an approved WhatsApp template message. Include `media_url` for templates with a
+        document, PDF or image header; include `template.params` for templates with body variables.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WhatsAppMessageRequest" }
+            examples:
+              withoutMedia:
+                summary: Template with variables
+                value:
+                  source: "919000000000"
+                  destination: "919876543210"
+                  template:
+                    id: "order_update"
+                    params: ["Asha", "ORD-1001"]
+              withMedia:
+                summary: Template with a media header
+                value:
+                  source: "919000000000"
+                  destination: "919876543210"
+                  template:
+                    id: "invoice_share"
+                  media_url: "https://example.com/files/invoice.pdf"
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/{source}/order-status/update:
+    post:
+      tags: [WhatsApp Messaging]
+      operationId: updateWhatsAppOrderStatus
+      summary: Update order status
+      description: "Updates the status of a WhatsApp order and sends the customer a status note."
+      parameters:
+        - name: source
+          in: path
+          required: true
+          description: "WhatsApp sender ID (WABA number) the order belongs to."
+          schema: { type: string }
+          example: "919000000000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderStatusRequest" }
+            example:
+              order_reference_id: "ORD-1001"
+              status: "shipped"
+              status_notes: "Thank you for your purchase"
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/{account}/payment/refund:
+    post:
+      tags: [WhatsApp Messaging]
+      operationId: refundWhatsAppOrder
+      summary: Refund an order payment
+      description: "Initiates a full or partial refund for a payment collected through a WhatsApp order."
+      parameters:
+        - name: account
+          in: path
+          required: true
+          description: "Account identifier segment for the payment endpoint, as provided by CPaaS+ at onboarding."
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefundRequest" }
+            example:
+              order_reference_id: "ORD-1001"
+              amount: "499.00"
+              speed: "Normal"
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/blocked-members:
+    get:
+      tags: [WhatsApp User Management]
+      operationId: listBlockedUsers
+      summary: List blocked users
+      description: "Returns a paginated list of users blocked for a WhatsApp sender."
+      parameters:
+        - { name: sender_id, in: query, required: true, description: "WhatsApp Business (WABA) number.", schema: { type: string }, example: "919000000000" }
+        - { name: per_page, in: query, required: false, description: "Records per page.", schema: { type: integer, minimum: 1 }, example: 50 }
+        - { name: page, in: query, required: false, description: "Page number.", schema: { type: integer, minimum: 1 }, example: 1 }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [WhatsApp User Management]
+      operationId: blockUsers
+      summary: Block users
+      description: "Blocks one or more phone numbers from messaging the given WhatsApp sender."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockedMembersRequest" }
+            example:
+              sender_id: "919000000000"
+              phone_numbers: ["919876543210"]
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [WhatsApp User Management]
+      operationId: unblockUsers
+      summary: Unblock users
+      description: "Removes one or more phone numbers from the blocked list."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BlockedMembersRequest" }
+            example:
+              sender_id: "919000000000"
+              phone_numbers: ["919876543210", "919876543211"]
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/blocked-members/import-csv:
+    post:
+      tags: [WhatsApp User Management]
+      operationId: importBlockedUsersCsv
+      summary: Bulk block or unblock users from CSV
+      description: "Uploads a CSV file of phone numbers to block in bulk."
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [sender_id, csv_file, action]
+              properties:
+                sender_id: { type: string, description: "WhatsApp Business (WABA) number." }
+                csv_file: { type: string, format: binary, description: "CSV file containing the phone numbers." }
+                action: { type: string, enum: [block], description: "Action to apply to the numbers in the file." }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/whatsapp/blocked-members/sync:
+    post:
+      tags: [WhatsApp User Management]
+      operationId: syncBlockedUsers
+      summary: Sync blocked users
+      description: "Synchronises the blocked-users list for a WhatsApp sender."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sender_id]
+              properties:
+                sender_id: { type: string, description: "WhatsApp Business (WABA) number.", example: "919000000000" }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/email/template/send:
+    post:
+      tags: [Email]
+      operationId: sendEmailTemplate
+      summary: Send email using a template
+      description: "Sends an email based on a template configured in the CPaaS+ portal. Variables in `params` map to the template in order."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmailTemplateRequest" }
+            example:
+              service_name: "primary-email-service"
+              template_name: "order_confirmation"
+              from: "orders@example.com"
+              from_name: "Example Store"
+              to: "asha@example.com"
+              cc: ["manager@example.com"]
+              subject: "Your order ORD-1001"
+              params: ["Asha", "ORD-1001"]
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/email/send:
+    post:
+      tags: [Email]
+      operationId: sendEmailOpenText
+      summary: Send email with open text
+      description: "Sends an email with a free-form body, optional cc/bcc and base64-encoded attachments."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmailOpenTextRequest" }
+            example:
+              account: "primary-email-service"
+              from: "orders@example.com"
+              from_name: "Example Store"
+              to: "asha@example.com"
+              subject: "Your invoice"
+              body: "Hi Asha, please find your invoice attached."
+              attachments:
+                - filename: "invoice.pdf"
+                  type: "application/pdf"
+                  content: "JVBERi0xLjQK..."
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/email/status:
+    get:
+      tags: [Email]
+      operationId: getEmailStatus
+      summary: Get email status
+      description: "Retrieves the delivery status of an email by message ID."
+      parameters:
+        - { name: id, in: query, required: true, description: "Message ID returned when the email was submitted.", schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/verify/send-otp:
+    post:
+      tags: [Email Verification]
+      operationId: sendEmailOtp
+      summary: Generate and send an OTP
+      description: "Generates a one-time password and delivers it to the destination email. The response contains a `unique_id` you must pass to the validation call."
+      parameters:
+        - { name: verification_id, in: query, required: true, description: "Verification ID fetched from the verification template in the CPaaS+ portal.", schema: { type: string } }
+        - { name: type, in: query, required: true, description: "Delivery channel for the OTP.", schema: { type: string, enum: [email] } }
+        - { name: email, in: query, required: true, description: "Destination email address.", schema: { type: string, format: email } }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/verify/validate-otp:
+    post:
+      tags: [Email Verification]
+      operationId: validateEmailOtp
+      summary: Validate an OTP
+      description: "Validates the OTP the user received against the `unique_id` returned by the send call."
+      parameters:
+        - { name: unique_id, in: query, required: true, description: "Unique ID returned in the response of the send-OTP request.", schema: { type: string } }
+        - { name: otp, in: query, required: true, description: "OTP value entered by the user.", schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/rcs/template/create:
+    post:
+      tags: [RCS Templates]
+      operationId: createRcsTemplate
+      summary: Create an RCS template
+      description: |
+        Creates an RCS template. Set `type` to choose the format:
+
+        - `text_message`: text with up to 11 suggestion buttons
+        - `rich_card`: a single card with media, title, description and up to 4 buttons
+        - `carousel`: 2 to 10 cards, each with up to 4 buttons
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: "#/components/schemas/RcsTemplateText" }
+                - { $ref: "#/components/schemas/RcsTemplateRichCard" }
+                - { $ref: "#/components/schemas/RcsTemplateCarousel" }
+              discriminator:
+                propertyName: type
+                mapping:
+                  text_message: "#/components/schemas/RcsTemplateText"
+                  rich_card: "#/components/schemas/RcsTemplateRichCard"
+                  carousel: "#/components/schemas/RcsTemplateCarousel"
+            examples:
+              textWithButtons:
+                summary: Plain text + buttons
+                value:
+                  name: "order_ready"
+                  agent_id: "your-agent-id"
+                  type: "text_message"
+                  textMessageContent: "Hello {{name}}, your order {{order_id}} is ready for pickup!"
+                  suggestions:
+                    - { suggestionType: reply, displayText: "Opt out", postback: "opt_out" }
+                    - { suggestionType: url_action, displayText: "View Details", url: "https://example.com/order/{{order_id}}", postback: "view_details" }
+                    - { suggestionType: dialer_action, displayText: "Call Support", phoneNumber: "+911234567890", postback: "call_support" }
+              richCard:
+                summary: Media + buttons
+                value:
+                  name: "promo_card"
+                  agent_id: "your-agent-id"
+                  type: "rich_card"
+                  orientation: "Vertical"
+                  height: "SHORT_HEIGHT"
+                  standAlone:
+                    cardTitle: "Festive Offer"
+                    cardDescription: "Flat 20% off on all orders this week."
+                    mediaUrl: "https://example.com/media/offer.jpg"
+                    suggestions:
+                      - { suggestionType: url_action, displayText: "Shop Now", url: "https://example.com/shop", postback: "shop_now" }
+              carousel:
+                summary: Carousel
+                value:
+                  name: "catalogue_carousel"
+                  agent_id: "your-agent-id"
+                  type: "carousel"
+                  width: "MEDIUM_WIDTH"
+                  height: "MEDIUM_HEIGHT"
+                  carouselList:
+                    - cardTitle: "Product A"
+                      cardDescription: "Lightweight and durable."
+                      mediaUrl: "https://example.com/media/a.jpg"
+                      suggestions:
+                        - { suggestionType: url_action, displayText: "View", url: "https://example.com/a", postback: "view_a" }
+                    - cardTitle: "Product B"
+                      cardDescription: "Our best seller."
+                      mediaUrl: "https://example.com/media/b.jpg"
+                      suggestions:
+                        - { suggestionType: url_action, displayText: "View", url: "https://example.com/b", postback: "view_b" }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/rcs/send:
+    post:
+      tags: [RCS Messaging]
+      operationId: sendRcsMessage
+      summary: Send an RCS message
+      description: |
+        Sends an RCS message. The same endpoint serves both **Vi** and **Jio** RCS routes; the
+        `content` payload differs slightly by route (see the examples). Choose the format with `message_type`:
+        `text`, `text_message_with_media`, `rich_card` or `carousel`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RcsSendRequest" }
+            examples:
+              viText:
+                summary: Vi - text
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "text"
+                  content:
+                    name: "order_ready"
+                    type: "text_message"
+                    botId: "your-bot-id"
+                    textMessageContent: "Your order is ready for pickup."
+                    suggestions:
+                      - { postback: "opt_out", displayText: "Opt out", suggestionId: "btn1", suggestionType: reply }
+              viTextWithMedia:
+                summary: Vi - text with media
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "text_message_with_media"
+                  content:
+                    name: "invoice_share"
+                    botId: "your-bot-id"
+                    documentUrl: "https://example.com/files/invoice.pdf"
+                    messageOrder: "media_at_top"
+                    textMessageContent: "Your invoice is attached."
+                    suggestions: []
+              viRichCard:
+                summary: Vi - rich card
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "rich_card"
+                  content:
+                    name: "promo_card"
+                    botId: "your-bot-id"
+                    height: "SHORT_HEIGHT"
+                    alignment: "LEFT"
+                    orientation: "Vertical"
+                    standAlone:
+                      cardId: "card1"
+                      mediaUrl: "https://example.com/media/offer.jpg"
+                      cardTitle: "Festive Offer"
+                      cardDescription: "Flat 20% off this week."
+              viCarousel:
+                summary: Vi - carousel
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "carousel"
+                  content:
+                    name: "catalogue_carousel"
+                    botId: "your-bot-id"
+                    width: "SMALL_WIDTH"
+                    height: "MEDIUM_HEIGHT"
+                    carouselList:
+                      - { cardId: "c1", mediaUrl: "https://example.com/media/a.jpg", cardTitle: "Product A", cardDescription: "Lightweight." }
+                      - { cardId: "c2", mediaUrl: "https://example.com/media/b.jpg", cardTitle: "Product B", cardDescription: "Best seller." }
+              jioText:
+                summary: Jio - text with buttons
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "text"
+                  content:
+                    textMessageContent: "Your appointment is confirmed."
+                    suggestions:
+                      - { suggestionType: url_action, displayText: "View", url: "https://example.com/appt", application: "BROWSER", postback: "view" }
+                      - { suggestionType: dialer_action, displayText: "Call us", phoneNumber: "+911234567890", postback: "call" }
+              jioRichCard:
+                summary: Jio - rich card
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "rich_card"
+                  content:
+                    height: "SHORT_HEIGHT"
+                    alignment: "LEFT"
+                    orientation: "Vertical"
+                    standAlone:
+                      mediaUrl: "https://example.com/media/offer.jpg"
+                      cardTitle: "Festive Offer"
+                      cardDescription: "Flat 20% off this week."
+                      suggestions:
+                        - { suggestionType: reply, displayText: "Interested", postback: "interested" }
+              jioCarousel:
+                summary: Jio - carousel (2 to 10 cards)
+                value:
+                  agent_id: "your-agent-id"
+                  to: ["919876543210"]
+                  message_type: "carousel"
+                  content:
+                    carouselList:
+                      - { mediaUrl: "https://example.com/media/a.jpg", cardTitle: "Product A", cardDescription: "Lightweight.", suggestions: [] }
+                      - mediaUrl: "https://example.com/media/b.jpg"
+                        cardTitle: "Product B"
+                        cardDescription: "Best seller."
+                        suggestions:
+                          - { suggestionType: url_action, displayText: "View", url: "https://example.com/b", postback: "view_b" }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/rcs/status:
+    get:
+      tags: [RCS Messaging]
+      operationId: getRcsStatus
+      summary: Get RCS message status
+      description: "Retrieves the delivery status of an RCS message by ID."
+      parameters:
+        - { name: id, in: query, required: true, description: "Message ID returned when the RCS message was submitted.", schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /:
+    servers:
+      - url: "{flowEndpointUrl}"
+        description: "Flow-specific endpoint URL copied from Flow Builder"
+        variables:
+          flowEndpointUrl:
+            default: https://your-cpaas-host.example.com/your-flow-endpoint
+            description: "Full endpoint URL generated for your flow in Flow Builder."
+    post:
+      tags: [Flow Builder]
+      operationId: triggerFlow
+      summary: Trigger a Flow Builder journey
+      description: |
+        Triggers a flow with contact data. The endpoint URL is generated per flow in Flow Builder.
+        Send the contact identifiers (`phone`, `email`) plus any variables your flow expects
+        (`var1`, `var2`, and so on).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string, description: "Contact mobile number.", example: "919876543210" }
+                email: { type: string, format: email, description: "Contact email address.", example: "asha@example.com" }
+              additionalProperties:
+                type: string
+                description: "Flow variables (for example `var1`, `var2`) as configured in your flow."
+            example:
+              phone: "919876543210"
+              email: "asha@example.com"
+              var1: "Asha"
+              var2: "ORD-1001"
+      responses:
+        "200": { $ref: "#/components/responses/Accepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "API token issued for your account. Send as `Authorization: Bearer <token>`."
+  responses:
+    Accepted:
+      description: "Request processed. The response body contains the platform's result (for example message or request IDs)."
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    Unauthorized:
+      description: "Missing, invalid or expired bearer token."
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+  schemas:
+    SmsTemplateSendRequest:
+      type: object
+      required: [alias, to]
+      properties:
+        alias: { type: string, description: "Template ID (alias) from the CPaaS+ web portal." }
+        to:
+          type: array
+          maxItems: 50
+          items: { type: string }
+          description: "Destination mobile numbers (up to 50)."
+        params:
+          type: object
+          additionalProperties: { type: string }
+          description: "Dynamic values keyed by variable position, as defined in the template (for example `{\"1\": \"value\"}`)."
+    SmsOpenTextRequest:
+      type: object
+      required: [from, to, text]
+      properties:
+        from: { type: string, description: "Registered sender / header." }
+        to: { type: array, items: { type: string }, description: "Destination mobile numbers." }
+        text: { type: string, description: "Message text." }
+        type:
+          type: string
+          enum: [N, U, A]
+          default: N
+          description: "`N` plain text (default), `U` Unicode, `A` auto-detect."
+        product:
+          type: string
+          enum: [Transactional, Promotional, OTP, Other]
+          description: "Traffic category."
+        template_id: { type: string, description: "Registered template ID. Mandatory in India." }
+        entity_id: { type: string, description: "Registered entity ID. Mandatory in India." }
+    WhatsAppMessageRequest:
+      type: object
+      required: [source, destination, template]
+      properties:
+        source: { type: string, description: "WhatsApp sender ID (WABA number)." }
+        destination: { type: string, description: "Recipient phone number." }
+        template:
+          type: object
+          required: [id]
+          properties:
+            id: { type: string, description: "Approved WhatsApp template ID." }
+            params:
+              type: array
+              items: { type: string }
+              description: "Values for the template body variables, in order."
+        media_url: { type: string, format: uri, description: "Public URL of a document, PDF or image for templates with a media header." }
+    OrderStatusRequest:
+      type: object
+      required: [order_reference_id, status]
+      properties:
+        order_reference_id: { type: string, description: "Reference ID of the payment / order." }
+        status:
+          type: string
+          enum: [partially-shipped, shipped, completed, canceled]
+          description: "New order status."
+        status_notes: { type: string, description: "Message shown to the customer with the status update." }
+    RefundRequest:
+      type: object
+      required: [order_reference_id, amount, speed]
+      properties:
+        order_reference_id: { type: string, description: "Reference ID used in the Order Details template." }
+        amount: { type: string, description: "Amount to refund." }
+        speed: { type: string, enum: [Normal, Instant], description: "Refund speed." }
+    BlockedMembersRequest:
+      type: object
+      required: [sender_id, phone_numbers]
+      properties:
+        sender_id: { type: string, description: "WhatsApp Business (WABA) number." }
+        phone_numbers: { type: array, items: { type: string }, description: "One or more phone numbers." }
+    EmailAttachment:
+      type: object
+      required: [filename, type, content]
+      properties:
+        filename: { type: string, description: "File name including extension." }
+        type: { type: string, description: "MIME type, for example `application/pdf`." }
+        content: { type: string, format: byte, description: "Base64-encoded file content." }
+    EmailTemplateRequest:
+      type: object
+      required: [service_name, template_name, from, to]
+      properties:
+        service_name: { type: string, description: "Service name of the email configuration." }
+        template_name: { type: string, description: "Name of the email template." }
+        from: { type: string, description: "Sender address on your configured domain." }
+        from_name: { type: string, description: "Display name for the sender." }
+        to: { type: string, format: email, description: "Destination email address." }
+        cc: { type: array, items: { type: string, format: email } }
+        bcc: { type: array, items: { type: string, format: email } }
+        subject: { type: string, description: "Subject line." }
+        params: { type: array, items: { type: string }, description: "Template variable values, in the order defined in the template." }
+        attachments: { type: array, items: { $ref: "#/components/schemas/EmailAttachment" } }
+    EmailOpenTextRequest:
+      type: object
+      required: [account, from, to, subject, body]
+      properties:
+        account: { type: string, description: "Service name of the email configuration." }
+        from: { type: string, description: "Sender address on your configured domain." }
+        from_name: { type: string, description: "Display name for the sender." }
+        to: { type: string, format: email, description: "Destination email address." }
+        cc: { type: array, items: { type: string, format: email } }
+        bcc: { type: array, items: { type: string, format: email } }
+        subject: { type: string }
+        body: { type: string, description: "Email body." }
+        attachments: { type: array, items: { $ref: "#/components/schemas/EmailAttachment" } }
+    RcsTemplateSuggestion:
+      type: object
+      required: [suggestionType, displayText]
+      properties:
+        suggestionType:
+          type: string
+          enum: [reply, url_action, dialer_action]
+          description: "`reply` quick reply, `url_action` opens a URL, `dialer_action` opens the dialer."
+        displayText: { type: string, maxLength: 25, description: "Button label (max 25 characters)." }
+        postback: { type: string, description: "Optional callback value returned when the button is tapped." }
+        url: { type: string, description: "Target URL for `url_action`. Variables are allowed." }
+        phoneNumber: { type: string, description: "Phone number for `dialer_action`." }
+    RcsTemplateCard:
+      type: object
+      properties:
+        cardTitle: { type: string, maxLength: 200 }
+        cardDescription: { type: string, maxLength: 2000 }
+        mediaUrl: { type: string, format: uri }
+        suggestions:
+          type: array
+          maxItems: 4
+          items: { $ref: "#/components/schemas/RcsTemplateSuggestion" }
+    RcsTemplateText:
+      type: object
+      required: [name, agent_id, type, textMessageContent]
+      properties:
+        name: { type: string, description: "Template name." }
+        agent_id: { type: string, description: "Your RCS agent ID." }
+        type: { type: string, const: text_message }
+        textMessageContent: { type: string, description: "Message text. Define variables with double braces, for example `{{name}}`." }
+        suggestions:
+          type: array
+          maxItems: 11
+          items: { $ref: "#/components/schemas/RcsTemplateSuggestion" }
+    RcsTemplateRichCard:
+      type: object
+      required: [name, agent_id, type, orientation, standAlone]
+      properties:
+        name: { type: string }
+        agent_id: { type: string }
+        type: { type: string, const: rich_card }
+        orientation: { type: string, enum: [Horizontal, Vertical] }
+        height:
+          type: string
+          enum: [SHORT_HEIGHT, MEDIUM_HEIGHT, TALL_HEIGHT]
+          description: "Card height. Applies when orientation is Vertical."
+        standAlone: { $ref: "#/components/schemas/RcsTemplateCard" }
+    RcsTemplateCarousel:
+      type: object
+      required: [name, agent_id, type, carouselList]
+      properties:
+        name: { type: string }
+        agent_id: { type: string }
+        type: { type: string, const: carousel }
+        width: { type: string, enum: [SMALL_WIDTH, MEDIUM_WIDTH] }
+        height: { type: string, enum: [SHORT_HEIGHT, MEDIUM_HEIGHT] }
+        carouselList:
+          type: array
+          minItems: 2
+          maxItems: 10
+          items: { $ref: "#/components/schemas/RcsTemplateCard" }
+    RcsSuggestion:
+      type: object
+      required: [suggestionType, displayText]
+      description: |
+        A button attached to a message. Which extra fields apply depends on `suggestionType`:
+        `url_action` (url, application), `dialer_action` (phoneNumber), `calendar_event`
+        (title, startTime, endTime, timeZone, description), `view_location_query` (query),
+        `view_location_latlong` (label, latitude, longitude). `reply` and `share_location` need only
+        `displayText` and `postback`.
+      properties:
+        suggestionType:
+          type: string
+          enum: [reply, url_action, dialer_action, share_location, calendar_event, view_location_query, view_location_latlong]
+        displayText: { type: string }
+        postback: { type: string, description: "Custom value returned when the button is tapped." }
+        suggestionId: { type: string, description: "Button ID (Vi route)." }
+        url: { type: string }
+        application: { type: string, description: "Application used to open the URL, for example `BROWSER`." }
+        phoneNumber: { type: string }
+        title: { type: string }
+        description: { type: string }
+        startTime: { type: string, description: "Format `YYYY-MM-DD HH:MM:SS`." }
+        endTime: { type: string, description: "Format `YYYY-MM-DD HH:MM:SS`." }
+        timeZone: { type: string, description: "ISO 8601 with zone, for example `2025-11-05T10:30:00[Asia/Kolkata]`." }
+        query: { type: string }
+        label: { type: string }
+        latitude: { type: string }
+        longitude: { type: string }
+    RcsCard:
+      type: object
+      properties:
+        cardId: { type: string, description: "Card ID (Vi route)." }
+        mediaUrl: { type: string, format: uri }
+        thumbnailUrl: { type: string, format: uri }
+        cardTitle: { type: string }
+        cardDescription: { type: string }
+        suggestions: { type: array, items: { $ref: "#/components/schemas/RcsSuggestion" } }
+    RcsContent:
+      type: object
+      description: "Message content. The fields used depend on `message_type` and on the carrier route (Vi or Jio)."
+      properties:
+        name: { type: string, description: "Template name (Vi route)." }
+        type: { type: string, description: "Content type, for example `text_message` (Vi route)." }
+        botId: { type: string, description: "Bot ID (Vi route)." }
+        textMessageContent: { type: string }
+        documentUrl: { type: string, format: uri, description: "Media URL for `text_message_with_media`." }
+        messageOrder: { type: string, description: "Position of media relative to text, for example `media_at_top`." }
+        height: { type: string, description: "`SHORT_HEIGHT`, `MEDIUM_HEIGHT` or `TALL_HEIGHT` (Jio supports SHORT and MEDIUM)." }
+        width: { type: string, description: "`SMALL_WIDTH` or `MEDIUM_WIDTH` (carousel)." }
+        alignment: { type: string, enum: [LEFT, RIGHT] }
+        orientation: { type: string, enum: [Vertical, Horizontal] }
+        standAlone: { $ref: "#/components/schemas/RcsCard" }
+        carouselList:
+          type: array
+          minItems: 2
+          maxItems: 10
+          items: { $ref: "#/components/schemas/RcsCard" }
+        suggestions: { type: array, items: { $ref: "#/components/schemas/RcsSuggestion" } }
+    RcsSendRequest:
+      type: object
+      required: [agent_id, to, message_type, content]
+      properties:
+        agent_id: { type: string, description: "Your RCS agent ID." }
+        to: { type: array, items: { type: string }, description: "Destination mobile numbers." }
+        message_type:
+          type: string
+          enum: [text, text_message_with_media, rich_card, carousel]
+        content: { $ref: "#/components/schemas/RcsContent" }

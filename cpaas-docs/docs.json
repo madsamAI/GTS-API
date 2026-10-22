@@ -1,0 +1,42 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "CPaaS+ API Documentation",
+  "colors": {
+    "primary": "#0E7C66",
+    "light": "#2FBF9F",
+    "dark": "#0B5F4E"
+  },
+  "api": {
+    "playground": { "display": "interactive" },
+    "examples": { "languages": ["curl", "python", "javascript"] }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "User Guide",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["index", "quickstart", "authentication"]
+          },
+          {
+            "group": "Channel guides",
+            "pages": [
+              "guides/sms",
+              "guides/whatsapp",
+              "guides/whatsapp-user-management",
+              "guides/email",
+              "guides/rcs",
+              "guides/flow-builder"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "openapi": "openapi.yaml"
+      }
+    ]
+  }
+}

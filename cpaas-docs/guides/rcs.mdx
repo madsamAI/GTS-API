@@ -1,0 +1,178 @@
+---
+title: "RCS"
+description: "Create RCS templates and send text, media, rich cards and carousels on Vi and Jio."
+---
+
+RCS (Rich Communication Services) delivers rich, interactive messages to a user's native messaging app. You need an **RCS agent** (`agent_id`) set up for your brand.
+
+<Steps>
+  <Step title="Create a template (optional)">
+    Define reusable content with `POST /api/rcs/template/create`.
+  </Step>
+  <Step title="Send a message">
+    Send with `POST /api/rcs/send`, choosing the format with `message_type`.
+  </Step>
+  <Step title="Check status">
+    Track delivery with `GET /api/rcs/status?id=...`.
+  </Step>
+</Steps>
+
+## Create templates
+
+`POST /api/rcs/template/create`. Set `type` to choose the format.
+
+<Tabs>
+  <Tab title="Text + buttons">
+    ```bash
+    curl -X POST "$BASE_URL/api/rcs/template/create" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "order_ready",
+        "agent_id": "YOUR_AGENT_ID",
+        "type": "text_message",
+        "textMessageContent": "Hello {{name}}, your order {{order_id}} is ready for pickup!",
+        "suggestions": [
+          { "suggestionType": "reply", "displayText": "Opt out", "postback": "opt_out" },
+          { "suggestionType": "url_action", "displayText": "View Details", "url": "https://example.com/order/{{order_id}}", "postback": "view_details" },
+          { "suggestionType": "dialer_action", "displayText": "Call Support", "phoneNumber": "+911234567890", "postback": "call_support" }
+        ]
+      }'
+    ```
+    Up to 11 buttons. Define variables with double braces.
+  </Tab>
+  <Tab title="Media + buttons">
+    ```bash
+    curl -X POST "$BASE_URL/api/rcs/template/create" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "promo_card",
+        "agent_id": "YOUR_AGENT_ID",
+        "type": "rich_card",
+        "orientation": "Vertical",
+        "height": "SHORT_HEIGHT",
+        "standAlone": {
+          "cardTitle": "Festive Offer",
+          "cardDescription": "Flat 20% off on all orders this week.",
+          "mediaUrl": "https://example.com/media/offer.jpg",
+          "suggestions": [
+            { "suggestionType": "url_action", "displayText": "Shop Now", "url": "https://example.com/shop", "postback": "shop_now" }
+          ]
+        }
+      }'
+    ```
+    `orientation` is `Horizontal` or `Vertical`. For Vertical cards, `height` is `SHORT_HEIGHT`, `MEDIUM_HEIGHT` or `TALL_HEIGHT`.
+  </Tab>
+  <Tab title="Carousel">
+    ```bash
+    curl -X POST "$BASE_URL/api/rcs/template/create" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "catalogue_carousel",
+        "agent_id": "YOUR_AGENT_ID",
+        "type": "carousel",
+        "width": "MEDIUM_WIDTH",
+        "height": "MEDIUM_HEIGHT",
+        "carouselList": [
+          { "cardTitle": "Product A", "cardDescription": "Lightweight.", "mediaUrl": "https://example.com/media/a.jpg",
+            "suggestions": [ { "suggestionType": "url_action", "displayText": "View", "url": "https://example.com/a", "postback": "view_a" } ] },
+          { "cardTitle": "Product B", "cardDescription": "Best seller.", "mediaUrl": "https://example.com/media/b.jpg",
+            "suggestions": [ { "suggestionType": "url_action", "displayText": "View", "url": "https://example.com/b", "postback": "view_b" } ] }
+        ]
+      }'
+    ```
+    A carousel needs at least 2 and at most 10 cards.
+  </Tab>
+</Tabs>
+
+### Limits
+
+| Item | Limit |
+| --- | --- |
+| Button label (`displayText`) | 25 characters |
+| Buttons on a text template | 11 |
+| Buttons on a card | 4 |
+| Card title | 200 characters |
+| Card description | 2000 characters |
+| Carousel cards | 2 to 10 |
+
+## Send messages
+
+`POST /api/rcs/send` serves both the **Vi** and **Jio** routes. The envelope is the same; the `content` differs slightly between routes.
+
+| `message_type` | Format |
+| --- | --- |
+| `text` | Plain text with optional buttons |
+| `text_message_with_media` | Text with a document or media URL (`documentUrl`, `messageOrder`) |
+| `rich_card` | Single card (`standAlone`) |
+| `carousel` | Multiple cards (`carouselList`) |
+
+<Tabs>
+  <Tab title="Vi: text">
+    ```bash
+    curl -X POST "$BASE_URL/api/rcs/send" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "agent_id": "YOUR_AGENT_ID",
+        "to": ["919876543210"],
+        "message_type": "text",
+        "content": {
+          "name": "order_ready",
+          "type": "text_message",
+          "botId": "YOUR_BOT_ID",
+          "textMessageContent": "Your order is ready for pickup.",
+          "suggestions": [
+            { "postback": "opt_out", "displayText": "Opt out", "suggestionId": "btn1", "suggestionType": "reply" }
+          ]
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Jio: text">
+    ```bash
+    curl -X POST "$BASE_URL/api/rcs/send" \
+      -H "Authorization: Bearer $API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "agent_id": "YOUR_AGENT_ID",
+        "to": ["919876543210"],
+        "message_type": "text",
+        "content": {
+          "textMessageContent": "Your appointment is confirmed.",
+          "suggestions": [
+            { "suggestionType": "url_action", "displayText": "View", "url": "https://example.com/appt", "application": "BROWSER", "postback": "view" },
+            { "suggestionType": "dialer_action", "displayText": "Call us", "phoneNumber": "+911234567890", "postback": "call" }
+          ]
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+See the **API Reference** tab for ready-to-run examples of every Vi and Jio variant (text with media, rich card, carousel).
+
+### Button types
+
+| `suggestionType` | Extra fields |
+| --- | --- |
+| `reply` | `postback` |
+| `url_action` | `url`, `application` |
+| `dialer_action` | `phoneNumber` |
+| `share_location` | none |
+| `calendar_event` | `title`, `startTime`, `endTime`, `timeZone`, `description` |
+| `view_location_query` | `query` |
+| `view_location_latlong` | `label`, `latitude`, `longitude` |
+
+<Note>
+  Calendar times use the format `YYYY-MM-DD HH:MM:SS`; `timeZone` uses ISO 8601 with a zone, for example `2025-11-05T10:30:00[Asia/Kolkata]`. Rich-card height on the Jio route supports `SHORT` and `MEDIUM`.
+</Note>
+
+## Check status
+
+```bash
+curl "$BASE_URL/api/rcs/status?id=MESSAGE_ID" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
